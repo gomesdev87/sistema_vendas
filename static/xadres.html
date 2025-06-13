@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabuleiro de Xadrez</title>
+    <!-- Inclui Tailwind CSS para facilitar o estilo responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define a fonte Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Cor de fundo suave */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Garante que o corpo ocupa toda a altura da tela */
+            margin: 0;
+            padding: 20px; /* Adiciona um pouco de padding geral */
+            box-sizing: border-box;
+        }
+
+        .board-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 800px; /* Limita a largura máxima do container */
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 16px; /* Cantos arredondados */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr); /* 8 colunas de tamanho igual */
+            grid-template-rows: repeat(8, 1fr);    /* 8 linhas de tamanho igual */
+            width: 100%; /* Ocupa 100% da largura do container */
+            aspect-ratio: 1 / 1; /* Mantém a proporção 1:1 (quadrado) */
+            border: 4px solid #333; /* Borda do tabuleiro */
+            border-radius: 8px; /* Cantos arredondados do tabuleiro */
+            overflow: hidden; /* Garante que os cantos arredondados funcionem bem */
+        }
+
+        .cell {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative; /* Para posicionar as peças */
+            font-size: clamp(2rem, 5vw, 4rem); /* Tamanho da fonte responsivo para as peças (emojis) */
+        }
+
+        /* Cores das casas */
+        .light {
+            background-color: #f0d9b5; /* Cor clara da casa (madeira clara) */
+        }
+
+        .dark {
+            background-color: #b58863; /* Cor escura da casa (madeira escura) */
+        }
+
+        /* Estilo das peças */
+        .piece {
+            position: absolute; /* Posiciona a peça dentro da célula */
+            cursor: grab; /* Cursor de arrastar */
+            user-select: none; /* Impede a seleção de texto do emoji */
+            transition: transform 0.1s ease-in-out; /* Suaviza o movimento ao arrastar */
+        }
+
+        .piece.player1 {
+            color: #d1d1d1; /* Cor para o jogador 1 (peças brancas) */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5); /* Sombra para destacar o emoji */
+        }
+
+        .piece.player2 {
+            color: #4a4a4a; /* Cor para o jogador 2 (peças pretas) */
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.5); /* Sombra para destacar o emoji */
+        }
+
+        /* Estilo para a célula de destino válida */
+        .cell.highlight-drop {
+            background-color: rgba(66, 135, 245, 0.5); /* Azul translúcido para destacar */
+            border: 2px dashed #4287f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="board-container">
+        <div id="chess-board" class="board">
+            <!-- As casas e as peças serão geradas aqui pelo JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const boardElement = document.getElementById('chess-board');
+            const boardSize = 8; // Tabuleiro 8x8
+            let draggedPiece = null; // Variável para armazenar a peça que está sendo arrastada
+
+            // Mapeamento das peças de xadrez para emojis
+            const chessPieces = {
+                'Rook': { 'player1': '♖', 'player2': '♜' },
+                'Knight': { 'player1': '♘', 'player2': '♞' },
+                'Bishop': { 'player1': '♗', 'player2': '♝' },
+                'Queen': { 'player1': '♕', 'player2': '♛' },
+                'King': { 'player1': '♔', 'player2': '♚' },
+                'Pawn': { 'player1': '♙', 'player2': '♟' }
+            };
+
+            // Função para criar as casas e as peças
+            function createBoard() {
+                for (let row = 0; row < boardSize; row++) {
+                    for (let col = 0; col < boardSize; col++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        
+                        // Determina se a casa é clara ou escura
+                        const isDark = (row + col) % 2 !== 0;
+                        cell.classList.add(isDark ? 'dark' : 'light');
+                        
+                        // Adiciona um ID para cada célula
+                        cell.id = `cell-${row}-${col}`;
+
+                        // Adiciona listeners para eventos de arrastar e soltar nas células (todas as células podem ser alvo de drop)
+                        cell.addEventListener('dragover', handleDragOver);
+                        cell.addEventListener('dragleave', handleDragLeave);
+                        cell.addEventListener('drop', handleDrop);
+
+                        // Coloca as peças de xadrez nas posições iniciais
+                        let pieceType = null;
+                        let player = null;
+
+                        // Peças do Jogador 2 (pretas - topo do tabuleiro)
+                        if (row === 0) {
+                            player = 'player2';
+                            if (col === 0 || col === 7) pieceType = 'Rook';
+                            else if (col === 1 || col === 6) pieceType = 'Knight';
+                            else if (col === 2 || col === 5) pieceType = 'Bishop';
+                            else if (col === 3) pieceType = 'Queen';
+                            else if (col === 4) pieceType = 'King';
+                        } else if (row === 1) {
+                            player = 'player2';
+                            pieceType = 'Pawn';
+                        }
+                        // Peças do Jogador 1 (brancas - base do tabuleiro)
+                        else if (row === 7) {
+                            player = 'player1';
+                            if (col === 0 || col === 7) pieceType = 'Rook';
+                            else if (col === 1 || col === 6) pieceType = 'Knight';
+                            else if (col === 2 || col === 5) pieceType = 'Bishop';
+                            else if (col === 3) pieceType = 'Queen';
+                            else if (col === 4) pieceType = 'King';
+                        } else if (row === 6) {
+                            player = 'player1';
+                            pieceType = 'Pawn';
+                        }
+
+                        if (pieceType && player) {
+                            const piece = createPiece(player, pieceType, `piece-${row}-${col}`);
+                            cell.appendChild(piece);
+                        }
+                        boardElement.appendChild(cell);
+                    }
+                }
+            }
+
+            // Função para criar uma peça com o tipo de jogador, tipo de peça e um ID único
+            function createPiece(playerType, pieceName, id) {
+                const piece = document.createElement('div');
+                piece.classList.add('piece', playerType);
+                piece.setAttribute('draggable', 'true'); // Torna a peça arrastável
+                piece.id = id; // Atribui um ID para a peça
+                piece.textContent = chessPieces[pieceName][playerType]; // Define o emoji da peça
+
+                // Adiciona listeners para eventos de arrastar na peça
+                piece.addEventListener('dragstart', handleDragStart);
+                piece.addEventListener('dragend', handleDragEnd);
+                return piece;
+            }
+
+            // --- Funções de Eventos de Arrastar e Soltar ---
+
+            function handleDragStart(e) {
+                draggedPiece = e.target; // Armazena a peça que está sendo arrastada
+                // Adiciona uma classe para dar feedback visual à peça arrastada
+                e.target.classList.add('opacity-50'); 
+                // Define os dados a serem transferidos (ID da peça)
+                e.dataTransfer.setData('text/plain', e.target.id);
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault(); // Permite que a peça seja solta na célula
+                // Destaca a célula se ela for um alvo de drop válido (qualquer célula vazia)
+                if (e.currentTarget.children.length === 0) {
+                    e.currentTarget.classList.add('highlight-drop');
+                }
+            }
+
+            function handleDragLeave(e) {
+                // Remove o destaque da célula ao sair dela
+                e.currentTarget.classList.remove('highlight-drop');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault(); // Previne o comportamento padrão do navegador
+                const targetCell = e.currentTarget; // A célula onde a peça foi solta
+
+                // Verifica se a célula de destino está vazia
+                if (targetCell.children.length === 0) {
+                    // Move a peça para a nova célula
+                    targetCell.appendChild(draggedPiece);
+                }
+                // Remove o destaque da célula após o drop
+                targetCell.classList.remove('highlight-drop');
+            }
+
+            function handleDragEnd(e) {
+                // Remove a opacidade da peça arrastada no final do arrasto
+                e.target.classList.remove('opacity-50');
+                draggedPiece = null; // Limpa a referência da peça arrastada
+                // Limpa qualquer destaque remanescente em todas as células
+                document.querySelectorAll('.cell').forEach(cell => {
+                    cell.classList.remove('highlight-drop');
+                });
+            }
+
+            createBoard(); // Cria o tabuleiro ao carregar a página
+        });
+    </script>
+</body>
+</html>
